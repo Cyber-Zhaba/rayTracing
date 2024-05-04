@@ -1,6 +1,7 @@
 import sys
 from random import random
 
+import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import trange
 
@@ -57,6 +58,7 @@ def render():
                 p = r.point_at_parameter(2.0)
                 col = col + color(r, world)
             col /= ns
+            col = np.sqrt(col)
             image[j, i] = col
 
     plt.imsave("image.png", image)
