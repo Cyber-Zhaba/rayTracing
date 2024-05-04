@@ -21,7 +21,7 @@ class Camera:
 
 def color(ray: Ray, world: Hittable):
     rec = HitRecord(0, np.array([0, 0, 0]), np.array([0, 0, 0]))
-    if world.hit(ray, 0, np.inf, rec):
+    if world.hit(ray, 0.001, np.inf, rec):
         target = rec.p + rec.normal + random_in_unit_sphere()
         return 0.5 * color(Ray(rec.p, target - rec.p), world)
     else:
