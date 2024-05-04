@@ -1,3 +1,4 @@
+import sys
 from random import random
 
 from matplotlib import pyplot as plt
@@ -20,11 +21,19 @@ class Camera:
 def color(ray: Ray, world: Hittable):
     rec = HitRecord(0, np.array([0, 0, 0]), np.array([0, 0, 0]))
     if world.hit(ray, 0, np.inf, rec):
-        return 0.5 * np.array([rec.normal[0] + 1, rec.normal[1] + 1, rec.normal[2] + 1])
+        target = rec.p + rec.normal + random_in_unit_sphere()
+        return 0.5 * color(Ray(rec.p, target - rec.p), world)
     else:
         unit_direction = ray.direction() / np.linalg.norm(ray.direction())
         t = 0.5 * (unit_direction[1] + 1.0)
         return (1.0 - t) * np.array([1.0, 1.0, 1.0]) + t * np.array([0.5, 0.7, 1.0])
+
+
+def random_in_unit_sphere():
+    p = 2 * np.array([random(), random(), random()]) - np.array([1, 1, 1])
+    while p[0] * p[0] + p[1] * p[1] + p[2] * p[2] >= 1:
+        p = 2 * np.array([random(), random(), random()]) - np.array([1, 1, 1])
+    return p
 
 
 def render():
