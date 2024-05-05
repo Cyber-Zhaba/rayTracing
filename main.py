@@ -1,11 +1,11 @@
-import sys
 from random import random
 
-import numpy as np
 from matplotlib import pyplot as plt
 from tqdm import trange
 
 from hittable import *
+from materials import Lambertian, Metal
+from objects import Sphere
 
 
 class Camera:
@@ -19,22 +19,19 @@ class Camera:
         return Ray(self.origin, self.lower_left_corner + u * self.horizontal + v * self.vertical - self.origin)
 
 
-def color(ray: Ray, world: Hittable):
-    rec = HitRecord(0, np.array([0, 0, 0]), np.array([0, 0, 0]))
+def color(ray: Ray, world: Hittable, depth=0):
+    rec = HitRecord(0, np.array([0.0, 0.0, 0.0]), np.array([0.0, 0.0, 0.0]), Material())
     if world.hit(ray, 0.001, np.inf, rec):
-        target = rec.p + rec.normal + random_in_unit_sphere()
-        return 0.5 * color(Ray(rec.p, target - rec.p), world)
+        scattered = Ray(np.array([0.0, 0.0, 0.0]), np.array([0.0, 0.0, 0.0]))
+        attenuation = np.array([0.0, 0.0, 0.0])
+        if depth < 50 and rec.material.scatter(ray, rec, attenuation, scattered):
+            return attenuation * color(scattered, world, depth + 1)
+        else:
+            return np.array([0.0, 0.0, 0.0])
     else:
         unit_direction = ray.direction() / np.linalg.norm(ray.direction())
         t = 0.5 * (unit_direction[1] + 1.0)
         return (1.0 - t) * np.array([1.0, 1.0, 1.0]) + t * np.array([0.5, 0.7, 1.0])
-
-
-def random_in_unit_sphere():
-    p = 2 * np.array([random(), random(), random()]) - np.array([1, 1, 1])
-    while p[0] * p[0] + p[1] * p[1] + p[2] * p[2] >= 1:
-        p = 2 * np.array([random(), random(), random()]) - np.array([1, 1, 1])
-    return p
 
 
 def render():
@@ -46,21 +43,26 @@ def render():
 
     image = np.zeros((ny, nx, 3))
 
-    world = Hittable([Sphere(np.array([0, 0, -1]), 0.5), Sphere(np.array([0, -100.5, -1]), 100)])
-
+    world = Hittable(
+        [
+            Sphere(np.array([0, 0, -1]), 0.5, Lambertian(np.array([0.8, 0.3, 0.3]))),
+            Sphere(np.array([0, -100.5, -1]), 100, Lambertian(np.array([0.8, 0.8, 0.0]))),
+            Sphere(np.array([1, 0, -1]), 0.5, Metal(np.array([0.8, 0.6, 0.2]), 1.0)),
+            Sphere(np.array([-1, 0, -1]), 0.5, Metal(np.array([0.8, 0.8, 0.8]), 0.3)),
+        ],
+    )
     for j in trange(ny):
         for i in range(nx):
-            col = np.array([0, 0, 0])
+            col = np.array([0.0, 0.0, 0.0])
             for s in range(ns):
-                u = (i + random() / 2) / nx
-                v = (ny - j + random() / 2) / ny
+                u = (i + random()) / nx
+                v = (ny - j + random()) / ny
                 r = cam.get_ray(u, v)
-                p = r.point_at_parameter(2.0)
                 col = col + color(r, world)
+
             col /= ns
             col = np.sqrt(col)
             image[j, i] = col
-
     plt.imsave("image.png", image)
 
 

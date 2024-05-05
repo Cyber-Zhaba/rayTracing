@@ -8,6 +8,11 @@ class Object:
         pass
 
 
+class Material:
+    def scatter(self, *args, **kwargs):
+        pass
+
+
 class Ray:
     def __init__(self, a: np.array, b: np.array):
         self.A = a
@@ -22,12 +27,26 @@ class Ray:
     def point_at_parameter(self, t: float):
         return self.A + t * self.B
 
+    def __sub__(self, other):
+        return Ray(self.A - other.A, self.B - other.B)
+
+    def __iadd__(self, other):
+        self.A = self.A + other.A
+        self.B = self.B + other.B
+        return self
+
+    def __add__(self, other):
+        if isinstance(other, Ray):
+            return Ray(self.A + other.A, self.B + other.B)
+        return Ray(self.A + other, self.B + other)
+
 
 class HitRecord:
-    def __init__(self, t: float, p: np.array, normal: np.array):
+    def __init__(self, t: float, p: np.array, normal: np.array, m: Material):
         self.t = t
         self.p = p
         self.normal = normal
+        self.material = m
 
 
 class Hittable:
@@ -42,30 +61,3 @@ class Hittable:
                 hit_anything = True
                 closest_so_far = rec.t
         return hit_anything
-
-
-class Sphere(Object):
-    def __init__(self, center: np.array, radius: float):
-        self.center = center
-        self.radius = radius
-
-    def hit(self, ray: Ray, t_min: float, t_max: float, rec: HitRecord):
-        oc = ray.origin() - self.center
-        a = np.dot(ray.direction(), ray.direction())
-        b = np.dot(oc, ray.direction())
-        c = np.dot(oc, oc) - self.radius * self.radius
-        discriminant = b * b - a * c
-        if discriminant > 0:
-            temp = (-b - np.sqrt(discriminant)) / a
-            if t_min < temp < t_max:
-                rec.t = temp
-                rec.p = ray.point_at_parameter(rec.t)
-                rec.normal = (rec.p - self.center) / self.radius
-                return True
-            temp = (-b + np.sqrt(discriminant)) / a
-            if t_min < temp < t_max:
-                rec.t = temp
-                rec.p = ray.point_at_parameter(rec.t)
-                rec.normal = (rec.p - self.center) / self.radius
-                return True
-        return False
