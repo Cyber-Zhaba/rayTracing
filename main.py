@@ -1,7 +1,7 @@
 from random import random
 
 from matplotlib import pyplot as plt
-from tqdm import trange
+from tqdm.contrib.concurrent import process_map
 
 from hittable import *
 from materials import Lambertian, Metal
@@ -34,6 +34,22 @@ def color(ray: Ray, world: Hittable, depth=0):
         return (1.0 - t) * np.array([1.0, 1.0, 1.0]) + t * np.array([0.5, 0.7, 1.0])
 
 
+def compute_row(args):
+    j, nx, ny, ns, world, cam = args
+    row = np.zeros((nx, 3))
+    for i in range(nx):
+        col = np.array([0.0, 0.0, 0.0])
+        for s in range(ns):
+            u = (i + random()) / nx
+            v = (ny - j + random()) / ny
+            r = cam.get_ray(u, v)
+            col = col + color(r, world)
+        col /= ns
+        col = np.sqrt(col)
+        row[i] = col
+    return row
+
+
 def render():
     nx = 200
     ny = 100
@@ -51,18 +67,13 @@ def render():
             Sphere(np.array([-1, 0, -1]), 0.5, Metal(np.array([0.8, 0.8, 0.8]), 0.3)),
         ],
     )
-    for j in trange(ny):
-        for i in range(nx):
-            col = np.array([0.0, 0.0, 0.0])
-            for s in range(ns):
-                u = (i + random()) / nx
-                v = (ny - j + random()) / ny
-                r = cam.get_ray(u, v)
-                col = col + color(r, world)
 
-            col /= ns
-            col = np.sqrt(col)
-            image[j, i] = col
+    params = [(i, nx, ny, ns, world, cam) for i in range(ny)]
+    results = process_map(compute_row, params, max_workers=8, chunksize=1, desc="Rendering")
+
+    for i, row in enumerate(results):
+        image[i] = row
+
     plt.imsave("image.png", image)
 
 
