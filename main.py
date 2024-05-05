@@ -4,7 +4,7 @@ from matplotlib import pyplot as plt
 from tqdm.contrib.concurrent import process_map
 
 from hittable import *
-from materials import Lambertian, Metal
+from materials import Lambertian, Metal, Glass
 from objects import Sphere
 
 
@@ -61,15 +61,18 @@ def render():
 
     world = Hittable(
         [
-            Sphere(np.array([0, 0, -1]), 0.5, Lambertian(np.array([0.8, 0.3, 0.3]))),
+            Sphere(np.array([0, -0.1, -1]), 0.4, Lambertian(np.array([0.1, 0.2, 0.5]))),
             Sphere(np.array([0, -100.5, -1]), 100, Lambertian(np.array([0.8, 0.8, 0.0]))),
-            Sphere(np.array([1, 0, -1]), 0.5, Metal(np.array([0.8, 0.6, 0.2]), 1.0)),
-            Sphere(np.array([-1, 0, -1]), 0.5, Metal(np.array([0.8, 0.8, 0.8]), 0.3)),
+            Sphere(np.array([1, 0, -1]), 0.5, Metal(np.array([0.8, 0.6, 0.2]), 0.3)),
+            Sphere(np.array([-1, -0.2, -1]), 0.3, Glass(1.5)),
+            Sphere(np.array([-1, -0.2, -1]), -0.25, Glass(1.5)),
+            Sphere(np.array([-0.3, -0.4, -0.5]), 0.1, Lambertian(np.array([0.1, 0.9, 0.45]))),
+            Sphere(np.array([-5.7, 2, -5.5]), 3, Lambertian(np.array([0.9, 0.2, 0.9]))),
         ],
     )
 
     params = [(i, nx, ny, ns, world, cam) for i in range(ny)]
-    results = process_map(compute_row, params, max_workers=8, chunksize=1, desc="Rendering")
+    results = process_map(compute_row, params, chunksize=1, desc="Rendering")
 
     for i, row in enumerate(results):
         image[i] = row
