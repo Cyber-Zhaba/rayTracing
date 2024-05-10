@@ -1,3 +1,4 @@
+from math import pi, tan
 from random import random
 
 from matplotlib import pyplot as plt
@@ -8,15 +9,42 @@ from materials import Lambertian, Metal, Glass
 from objects import Sphere
 
 
+def random_in_unit_disk():
+    p = 2 * np.array([random(), random(), random()]) - np.array([1, 1, 0]).astype(float)
+    while np.dot(p, p) >= 1.0:
+        p = 2 * np.array([random(), random(), random()]) - np.array([1, 1, 0]).astype(float)
+    return p
+
+
 class Camera:
-    def __init__(self):
-        self.lower_left_corner = np.array([-2.0, -1.0, -1.0])
-        self.horizontal = np.array([4.0, 0.0, 0.0])
-        self.vertical = np.array([0.0, 2.0, 0.0])
-        self.origin = np.array([0.0, 0.0, 0.0])
+    def __init__(self, look_from, look_at, vup, fov, aspect, aperture, focus_dist):
+        self.lens_radius = aperture / 2
+        self.theta = fov * pi / 180
+        self.half_height = tan(self.theta / 2)
+        self.half_weight = aspect * self.half_height
+        self.origin = look_from
+
+        w = look_from - look_at
+        w = w / np.linalg.norm(w)
+
+        cross = lambda v1, v2: np.array([v1[1] * v2[2] - v1[2] * v2[1],
+                                         -(v1[0] * v2[2] - v1[2] * v2[0]),
+                                         v2[0] * v2[1] - v1[1] * v2[0]])
+
+        u = cross(vup, w)
+        u = u / np.linalg.norm(u)
+
+        v = cross(w, u)
+
+        self.lower_left_corner = self.origin - self.half_weight * u * focus_dist - self.half_height * v * focus_dist - w * focus_dist
+        self.horizontal = 2 * self.half_weight * u * focus_dist
+        self.vertical = 2 * self.half_height * v * focus_dist
 
     def get_ray(self, u, v):
-        return Ray(self.origin, self.lower_left_corner + u * self.horizontal + v * self.vertical - self.origin)
+        rd = self.lens_radius * random_in_unit_disk()
+        offset = u * rd[0] + v * rd[1]
+        return Ray(self.origin + offset,
+                   self.lower_left_corner + u * self.horizontal + v * self.vertical - self.origin - offset)
 
 
 def color(ray: Ray, world: Hittable, depth=0):
@@ -35,7 +63,7 @@ def color(ray: Ray, world: Hittable, depth=0):
 
 
 def compute_row(args):
-    j, nx, ny, ns, world, cam = args
+    j, nx, ny, ns, cam, world = args
     row = np.zeros((nx, 3))
     for i in range(nx):
         col = np.array([0.0, 0.0, 0.0])
@@ -51,28 +79,49 @@ def compute_row(args):
 
 
 def render():
-    nx = 200
-    ny = 100
-    ns = 100
+    nx = 400
+    ny = 300
+    ns = 20
 
-    cam = Camera()
+    look_from = np.array([8, 1.8, 3])
+    look_at = np.array([0, 0, 0])
+    dist_to_focus = np.array([4, 1, 0]) - look_at
+    dist_to_focus = np.sqrt(dist_to_focus[0] ** 2 + dist_to_focus[1] ** 2 + dist_to_focus[2] ** 2)
+    aperture = 0.02
+
+    cam = Camera(look_from, look_at, np.array([0, 1, 0]), 50, nx / ny, aperture, dist_to_focus)
+
+    world_list = [Sphere(np.array([0, -1000, 0]), 1000, Lambertian(np.array([0.5, 0.5, 0.5])))]
+
+    for a in range(-11, 11):
+        for b in range(-11, 11):
+            mat = random()
+            center = np.array([a + 0.9 * random(), 0.2, b + 0.9 * random()])
+            if mat < 0.8:
+                world_list.append(
+                    Sphere(center, 0.2,
+                           Lambertian(np.array([random() * random(), random() * random(), random() * random()])))
+                )
+            elif mat < 0.95:
+                world_list.append(
+                    Sphere(center, 0.2,
+                           Metal(np.array([0.5 * (1 + random()), 0.5 * (1 + random()), 0.5 * (1 + random())])))
+                )
+            else:
+                world_list.append(
+                    Sphere(center, 0.2, Glass(1.5))
+                )
+
+    world_list.append(Sphere(np.array([0, 1, 0]), 1, Glass(1.5)))
+    world_list.append(Sphere(np.array([-4, 1, 0]), 1, Lambertian(np.array([0.4, 0.2, 0.1]))))
+    world_list.append(Sphere(np.array([4, 1, 0]), 1, Metal(np.array([0.7, 0.6, 0.5]), 0)))
+
+    world = Hittable(world_list)
 
     image = np.zeros((ny, nx, 3))
 
-    world = Hittable(
-        [
-            Sphere(np.array([0, -0.1, -1]), 0.4, Lambertian(np.array([0.1, 0.2, 0.5]))),
-            Sphere(np.array([0, -100.5, -1]), 100, Lambertian(np.array([0.8, 0.8, 0.0]))),
-            Sphere(np.array([1, 0, -1]), 0.5, Metal(np.array([0.8, 0.6, 0.2]), 0.3)),
-            Sphere(np.array([-1, -0.2, -1]), 0.3, Glass(1.5)),
-            Sphere(np.array([-1, -0.2, -1]), -0.25, Glass(1.5)),
-            Sphere(np.array([-0.3, -0.4, -0.5]), 0.1, Lambertian(np.array([0.1, 0.9, 0.45]))),
-            Sphere(np.array([-5.7, 2, -5.5]), 3, Lambertian(np.array([0.9, 0.2, 0.9]))),
-        ],
-    )
-
-    params = [(i, nx, ny, ns, world, cam) for i in range(ny)]
-    results = process_map(compute_row, params, chunksize=1, desc="Rendering")
+    params = [(i, nx, ny, ns, cam, world) for i in range(ny)]
+    results = process_map(compute_row, params, max_workers=15, chunksize=1, desc="Rendering")
 
     for i, row in enumerate(results):
         image[i] = row
