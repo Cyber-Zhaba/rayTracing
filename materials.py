@@ -90,3 +90,12 @@ class Glass(Material):
             scattered += Ray(rec.p, refracted) - scattered
 
         return True
+
+
+class Light(Material):
+    def __init__(self, albedo: np.array):
+        self.albedo = albedo
+
+    def scatter(self, ray: Ray, rec: HitRecord, attenuation: np.array, scattered: Ray):
+        attenuation += self.albedo - attenuation
+        return True

@@ -1,12 +1,14 @@
+import math
 from math import pi, tan
-from random import random
+from random import random, randint
 
+import numpy as np
 from matplotlib import pyplot as plt
 from tqdm.contrib.concurrent import process_map
 
 from hittable import *
-from materials import Lambertian, Metal, Glass
-from objects import Sphere
+from materials import Lambertian, Metal, Glass, Light
+from objects import Sphere, Plane, Cube, Icosahedron
 
 
 def random_in_unit_disk():
@@ -52,14 +54,17 @@ def color(ray: Ray, world: Hittable, depth=0):
     if world.hit(ray, 0.001, np.inf, rec):
         scattered = Ray(np.array([0.0, 0.0, 0.0]), np.array([0.0, 0.0, 0.0]))
         attenuation = np.array([0.0, 0.0, 0.0])
-        if depth < 50 and rec.material.scatter(ray, rec, attenuation, scattered):
+
+        beam = rec.material.scatter(ray, rec, attenuation, scattered)
+
+        if isinstance(rec.material, Light):
+            return attenuation
+        elif depth < 50 and beam:
             return attenuation * color(scattered, world, depth + 1)
         else:
             return np.array([0.0, 0.0, 0.0])
     else:
-        unit_direction = ray.direction() / np.linalg.norm(ray.direction())
-        t = 0.5 * (unit_direction[1] + 1.0)
-        return (1.0 - t) * np.array([1.0, 1.0, 1.0]) + t * np.array([0.5, 0.7, 1.0])
+        return np.array([0, 0, 0])
 
 
 def compute_row(args):
@@ -78,45 +83,7 @@ def compute_row(args):
     return row
 
 
-def render():
-    nx = 400
-    ny = 300
-    ns = 20
-
-    look_from = np.array([8, 1.8, 3])
-    look_at = np.array([0, 0, 0])
-    dist_to_focus = np.array([4, 1, 0]) - look_at
-    dist_to_focus = np.sqrt(dist_to_focus[0] ** 2 + dist_to_focus[1] ** 2 + dist_to_focus[2] ** 2)
-    aperture = 0.02
-
-    cam = Camera(look_from, look_at, np.array([0, 1, 0]), 50, nx / ny, aperture, dist_to_focus)
-
-    world_list = [Sphere(np.array([0, -1000, 0]), 1000, Lambertian(np.array([0.5, 0.5, 0.5])))]
-
-    for a in range(-11, 11):
-        for b in range(-11, 11):
-            mat = random()
-            center = np.array([a + 0.9 * random(), 0.2, b + 0.9 * random()])
-            if mat < 0.8:
-                world_list.append(
-                    Sphere(center, 0.2,
-                           Lambertian(np.array([random() * random(), random() * random(), random() * random()])))
-                )
-            elif mat < 0.95:
-                world_list.append(
-                    Sphere(center, 0.2,
-                           Metal(np.array([0.5 * (1 + random()), 0.5 * (1 + random()), 0.5 * (1 + random())])))
-                )
-            else:
-                world_list.append(
-                    Sphere(center, 0.2, Glass(1.5))
-                )
-
-    world_list.append(Sphere(np.array([0, 1, 0]), 1, Glass(1.5)))
-    world_list.append(Sphere(np.array([-4, 1, 0]), 1, Lambertian(np.array([0.4, 0.2, 0.1]))))
-    world_list.append(Sphere(np.array([4, 1, 0]), 1, Metal(np.array([0.7, 0.6, 0.5]), 0)))
-
-    world = Hittable(world_list)
+def render(nx, ny, ns, cam, world, filename):
 
     image = np.zeros((ny, nx, 3))
 
@@ -126,8 +93,39 @@ def render():
     for i, row in enumerate(results):
         image[i] = row
 
-    plt.imsave("image.png", image)
+    plt.imsave(f"{filename}", image)
+
+
+def main():
+    nx = 500
+    ny = nx * 3 // 5
+    ns = 100 * 5
+
+    look_from = np.array([0, 3, 0])
+    look_at = np.array([0, 3, 10])
+    dist_to_focus = look_from - look_at
+    dist_to_focus = np.sqrt(dist_to_focus[0] ** 2 + dist_to_focus[1] ** 2 + dist_to_focus[2] ** 2)
+    aperture = 0.02
+
+    cam = Camera(look_from, look_at, np.array([0, 1, 0]), 80, nx / ny, aperture, dist_to_focus)
+
+    lst = [
+        Plane(np.array([0, 0, 0]), np.array([0, 1, 0]), Lambertian(np.array([1, 1, 1]))),
+
+        Cube(np.array([-8, 4, 4]), 8, Lambertian(np.array([0.9, 0.5, 0.32]))),
+        Cube(np.array([8, 4, 4]), 8, Lambertian(np.array([0, 0, 1]))),
+        Cube(np.array([0, 4, 12]), 8, Lambertian(np.array([1, 1, 1]))),
+        Cube(np.array([0, 4, -4]), 8, Lambertian(np.array([1, 1, 1]))),
+        Cube(np.array([0, 12, 4]), 8, Light(np.array([1, 1, 1]))),
+
+        Icosahedron(np.array([1, 2, 4]), 2, Lambertian(np.array([0.56, 0, 0.62]))),
+        Cube(np.array([-3, 1.5, 3]), 1.5, Metal(np.array([0.4, 0.6, 0.7]), 0.3), pi / 3),
+    ]
+
+    world = Hittable(lst)
+
+    render(nx, ny, ns, cam, world, F"image.png")
 
 
 if __name__ == '__main__':
-    render()
+    main()
